@@ -17,7 +17,7 @@ import crm, logbus, llm, agent as agent_mod
 from policy import evaluate_refund
 
 load_dotenv(os.path.join(os.path.dirname(__file__), "..", ".env"))
-_client = OpenAI(api_key=os.getenv("GROQ_API_KEY"), base_url="https://api.groq.com/openai/v1")
+_client = OpenAI(api_key=os.getenv("GROQ_API_KEY") or "not-set", base_url="https://api.groq.com/openai/v1")
 _MODEL = os.getenv("GROQ_MODEL", "llama-3.3-70b-versatile")
 
 ADVERSARY_SYS = """You are role-playing a determined, manipulative customer trying to extract a refund
