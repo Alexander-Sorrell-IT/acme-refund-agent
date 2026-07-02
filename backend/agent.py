@@ -9,6 +9,7 @@ from openai import OpenAI
 from dotenv import load_dotenv
 import tools, crm, logbus
 from policy import evaluate_refund
+from audit import audit_reply
 
 load_dotenv()
 _client = OpenAI(api_key=os.getenv("GROQ_API_KEY"),
@@ -61,6 +62,7 @@ def run_turn(history_messages):
     """history_messages: list of {role, content}. Returns (assistant_reply, updated_messages)."""
     messages = [{"role": "system", "content": SYSTEM}] + history_messages
     logbus.publish("user", history_messages[-1]["content"] if history_messages else "")
+    last_verdict = {}
     for step in range(8):  # agent loop
         resp = None
         for attempt in range(3):  # retry transient LLM failures (visible in the log)
@@ -87,11 +89,17 @@ def run_turn(history_messages):
                 except Exception:
                     args = {}
                 result = _dispatch(tc.function.name, args)
+                if tc.function.name == "evaluate_refund_policy" and isinstance(result, dict) and result.get("decision"):
+                    last_verdict = result
                 messages.append({"role": "tool", "tool_call_id": tc.id,
                                  "content": json.dumps(result)})
             continue
         reply = msg.content or ""
         logbus.publish("agent", reply)
+        # thoth fold: deterministically audit the agent's words against the verdict
+        if last_verdict:
+            a = audit_reply(reply, last_verdict)
+            logbus.publish("audit", f"reply audit: {a['grade']}" + ("" if a['consistent'] else " — " + "; ".join(a['flags'])), a)
         return reply, messages[1:]
     logbus.publish("error", "agent loop hit step limit")
     return "I've gathered the details but need a moment — let me connect you with a specialist.", messages[1:]

@@ -29,7 +29,7 @@ Same order in → same verdict out, every time, with a citation. That's the whol
 | **Agent backend** | `backend/agent.py` — Groq function-calling loop (sequential tool calls; retry-with-backoff on LLM failure, visible in the log) |
 | **Tools validate policy** | `backend/tools.py` — `lookup_customer`, `get_order` (ownership check), `evaluate_refund_policy` (deterministic), `issue_refund` (re-verified) |
 | **Frontend** | `frontend/index.html` customer chat · `frontend/admin.html` **real-time reasoning-log dashboard** |
-| **⭐ Differentiator** | `backend/redteam.py` — **adversarial red-team harness**: an adversarial "customer" attacks the agent (prompt injection, false authority, guilt trips, urgency, double-dip) and a **deterministic grader proves the agent held the line.** Latest run: **8/8 held, 0 violations.** |
+| **⭐ Differentiator 1 (doomcaller fold)** | `backend/redteam.py` — **adversarial red-team harness**: an adversarial "customer" attacks the agent (prompt injection, false authority, guilt trips, urgency, double-dip) and a **deterministic grader proves the agent held the line.** Latest run: **8/8 held, 0 violations.** |
 
 ## Why the red-team harness matters (the part no one else brings)
 Anyone can build a happy-path refund bot. The risk in production is the *unhappy* path — a customer
@@ -71,6 +71,7 @@ red-team ──▶ adversarial customer attacks the whole loop ──▶ determi
 ## Design notes
 - **Rule precedence** (`refund_policy.md`): ownership → abuse-hold → already-refunded → non-refundable category → window → high-value → condition. E.g. a *defective* item that's *past the window* is still denied (R1 beats R5); a *defective* item over $500 escalates (R6 beats R5).
 - **`days_since_delivery`** is stored on each order so demos are stable regardless of run date.
-- **Voice (bonus):** the pipeline is designed so a spoken channel (Deepgram STT → agent → ElevenLabs TTS) can be transcribed and **audited deterministically** — the same verify-the-model principle, extended to voice. (Stubbed for the core submission.)
+- **⭐ Differentiator 2 (thoth fold):** `backend/audit.py` deterministically audits the agent's *reply* against the verdict — if the agent's words imply an approval when the engine said DENY (or promise cash when it's store-credit-only), it's **FLAGGED**. Same pure-function-grades-what-the-model-said principle as [thoth](https://github.com/Alexander-Sorrell-IT/thoth); it runs on text today and on the Deepgram transcript when the voice channel is on.
+- **Voice (bonus):** Deepgram STT → agent → ElevenLabs TTS; the audit above grades the spoken transcript identically.
 
 Author: **Alexander Sorrell** · github.com/Alexander-Sorrell-IT

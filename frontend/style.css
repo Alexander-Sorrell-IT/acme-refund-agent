@@ -30,3 +30,5 @@ header a { color: var(--accent); text-decoration: none; font-size: 13px; }
 .retry, .error { border-left-color:var(--red); } .retry .k, .error .k{color:var(--red);}
 .agent { border-left-color:#58a6ff; } .agent .k{color:#58a6ff;}
 .legend { padding:10px 20px; border-top:1px solid var(--line); color:var(--muted); font-size:11px; }
+
+.audit { border-left-color:#d29922; } .audit .k{color:#d29922;}
