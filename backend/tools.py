@@ -1,6 +1,7 @@
 """Tools the agent can call. Each one logs to the reasoning bus, and the policy
 decision is delegated to the DETERMINISTIC engine (policy.py) — never the LLM."""
-import crm, logbus
+import time
+import crm, logbus, receipts
 from policy import evaluate_refund
 
 def lookup_customer(query: str):
@@ -32,6 +33,9 @@ def evaluate_refund_policy(customer_id: str, order_id: str):
         return v
     verdict = evaluate_refund(c, o).dict()
     logbus.publish("verdict", f"{verdict['decision']} ({verdict['rule']})", verdict)
+    # verifiable-receipt fold: write a tamper-evident, offline-verifiable receipt for this decision
+    rc = receipts.append_receipt(customer_id, order_id, verdict, ts=str(round(time.time(), 3)))
+    logbus.publish("receipt", f"receipt #{rc['seq']} sealed — hash {rc['hash'][:12]}…", {"seq": rc["seq"], "hash": rc["hash"]})
     return verdict
 
 def issue_refund(order_id: str, verdict: dict):

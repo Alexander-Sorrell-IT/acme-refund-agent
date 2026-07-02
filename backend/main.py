@@ -33,6 +33,12 @@ async def run_redteam():
     return JSONResponse(report)
 
 
+@app.get("/receipts")
+async def receipts_list():
+    import receipts
+    return JSONResponse({"rows": receipts.all_receipts(), "verify": receipts.verify_chain(), "salt": receipts.SALT})
+
+
 @app.get("/api/customers")
 async def customers():
     # a directory the demo user can pull sample names/orders from

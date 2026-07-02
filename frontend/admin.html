@@ -2,8 +2,8 @@
 <meta name="viewport" content="width=device-width, initial-scale=1"><link rel="stylesheet" href="/static/style.css"></head>
 <body><div class="wrap" style="max-width:900px">
 <header><div><h1>Agent Reasoning Logs 🔍</h1><div class="sub">Live trace · tool calls, deterministic verdicts, failures &amp; retries</div></div>
-<div><button id="rt" style="background:#f85149;color:#fff;border:0;padding:9px 16px;border-radius:8px;cursor:pointer;font-weight:600;margin-right:10px">⚔️ Run Red Team</button><a href="/" target="_blank" style="color:var(--accent)">← Customer chat</a></div></header>
-<div id="rtresult"></div>
+<div><button id="rt" style="background:#f85149;color:#fff;border:0;padding:9px 16px;border-radius:8px;cursor:pointer;font-weight:600;margin-right:8px">⚔️ Run Red Team</button><button id="rcpt" style="background:#238636;color:#fff;border:0;padding:9px 16px;border-radius:8px;cursor:pointer;font-weight:600;margin-right:10px">🧾 Verify Receipts</button><a href="/" target="_blank" style="color:var(--accent)">← Customer chat</a></div></header>
+<div id="rtresult"></div><div id="rcptresult"></div>
 <div class="log" id="log"></div>
 <div class="legend">Legend: <span style="color:var(--accent)">USER</span> · <span style="color:var(--purple)">LLM</span> · <span style="color:var(--muted)">TOOL</span> · <span style="color:var(--green)">VERDICT</span> (amber = deny/escalate) · <span style="color:#58a6ff">AGENT</span> · <span style="color:var(--red)">RETRY/ERROR</span></div>
 </div>
@@ -33,5 +33,14 @@ rt.onclick=async()=>{
       <div style="color:var(--muted);font-size:12px;margin:4px 0 8px">Adversarial customers tried to manipulate the agent into unapproved refunds. The deterministic grader checks realized actions against the policy verdict.</div>${rows}</div>`;
   }catch(e){ rtr.innerHTML='<div style="padding:12px 20px;color:var(--red)">error running red team</div>'; }
   rt.disabled=false; rt.textContent='⚔️ Run Red Team';
+};
+const rcpt=document.getElementById('rcpt'), rcr=document.getElementById('rcptresult');
+rcpt.onclick=async()=>{
+  const j=await (await fetch('/receipts')).json();
+  const v=j.verify, ok=v.ok;
+  const rows=j.rows.map(r=>`<div style="font-family:ui-monospace,monospace;font-size:11px;color:var(--muted);padding:1px 0">#${r.seq} ${r.action}(${r.rule}) ${r.customer_id}/${r.order_id} $${r.amount} · hash ${r.hash.slice(0,16)}… · prev ${r.prev_hash.slice(0,8)}…</div>`).join('');
+  rcr.innerHTML=`<div style="margin:12px 20px;padding:14px 18px;border-radius:10px;border:1px solid ${ok?'var(--green)':'var(--red)'};background:var(--panel)">
+    <div style="font-size:18px;font-weight:700;color:${ok?'var(--green)':'var(--red)'}">${ok?'✅ CHAIN VERIFIED · '+v.count+' tamper-evident receipts':'❌ CHAIN BROKEN at receipt #'+v.broken_seq}</div>
+    <div style="color:var(--muted);font-size:12px;margin:4px 0 8px">Hash-chained receipts (salt <code>${j.salt}</code>). Re-verifiable offline in pure Python OR Node (<code>node verifier.mjs data/receipts_export.json</code>). Flip one byte → the chain goes red.</div>${rows||'<div style="color:var(--muted);font-size:12px">No receipts yet — process a refund first.</div>'}</div>`;
 };
 </script></body></html>

@@ -2,8 +2,10 @@
 
 > Most "AI refund agent" demos are something you have to **trust**. This one is something you can **verify.**
 > The LLM talks to the customer and orchestrates tools — but a **deterministic policy engine owns every
-> approve/deny decision**, and an **adversarial red-team harness proves the agent can't be manipulated**
-> into issuing a refund the policy forbids.
+> approve/deny decision** (R1), it **can't be jailbroken** into a bad refund (adversarial red-team, R2),
+> it **can't lie** about the decision in words (deterministic output audit, R3), and **every decision is
+> sealed in a tamper-evident receipt** re-verifiable offline in two languages (hash-chain, R4).
+> *Models propose; deterministic systems own the verdict, the safety proof, the truthfulness, and the audit trail.*
 
 Built for the Foundersmax AI Engineer take-home. Stack: **FastAPI + Groq (llama-3.3-70b) function-calling + a pure-Python policy engine + a live reasoning-log dashboard.**
 
@@ -72,6 +74,7 @@ red-team ──▶ adversarial customer attacks the whole loop ──▶ determi
 - **Rule precedence** (`refund_policy.md`): ownership → abuse-hold → already-refunded → non-refundable category → window → high-value → condition. E.g. a *defective* item that's *past the window* is still denied (R1 beats R5); a *defective* item over $500 escalates (R6 beats R5).
 - **`days_since_delivery`** is stored on each order so demos are stable regardless of run date.
 - **⭐ Differentiator 2 (thoth fold):** `backend/audit.py` deterministically audits the agent's *reply* against the verdict — if the agent's words imply an approval when the engine said DENY (or promise cash when it's store-credit-only), it's **FLAGGED**. Same pure-function-grades-what-the-model-said principle as [thoth](https://github.com/Alexander-Sorrell-IT/thoth); it runs on text today and on the Deepgram transcript when the voice channel is on.
+- **⭐ Differentiator 3 (on-the-record / glass-box-alpha fold):** `backend/receipts.py` seals **every decision into a hash-chained, tamper-evident receipt** (`SHA256(salt ‖ prev_hash ‖ canonical_json(row))`, genesis = 64 zeros). The chain re-verifies **offline in pure Python (`verify_chain`) OR pure Node — your actual `verifier.mjs` from [on-the-record](https://github.com/Alexander-Sorrell-IT/on-the-record)** — `node verifier.mjs data/receipts_export.json` → `CHAIN OK`. Flip one byte of any receipt → both verifiers report `BROKEN AT seq=N`. The reasoning log becomes a **cryptographic audit trail no one has to trust.**
 - **Voice (bonus):** Deepgram STT → agent → ElevenLabs TTS; the audit above grades the spoken transcript identically.
 
 Author: **Alexander Sorrell** · github.com/Alexander-Sorrell-IT
