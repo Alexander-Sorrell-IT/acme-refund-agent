@@ -41,6 +41,10 @@ feature**: `python backend/redteam.py` runs a battery of manipulation attacks an
 [doomcaller](https://github.com/Alexander-Sorrell-IT/doomcaller) project — an adversarial generator, a
 deterministic judge. A refund agent isn't done when it works; it's done when you can't break it.
 
+**Two levels of adversarial proof:**
+- `redteam.py` — 8 *scripted* attacks (fast, deterministic). Latest: **8/8 held, 0 violations.**
+- `adversary.py` — **live LLM adversaries that IMPROVISE and press across multiple turns** (fake authority → guilt → prompt injection → threats, escalating when denied). Latest: **5/5 held across 4-turn attacks, 0 violations.** `python backend/adversary.py`.
+
 ---
 
 ## Run it
