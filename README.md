@@ -1,5 +1,8 @@
 # Acme Refund Agent — a refund agent you can *prove* won't be talked into a bad refund
 
+[![CI](https://github.com/Alexander-Sorrell-IT/acme-refund-agent/actions/workflows/ci.yml/badge.svg)](https://github.com/Alexander-Sorrell-IT/acme-refund-agent/actions/workflows/ci.yml)
+
+
 > Most "AI refund agent" demos are something you have to **trust**. This one is something you can **verify.**
 > The LLM talks to the customer and orchestrates tools — but a **deterministic policy engine owns every
 > approve/deny decision** (R1), it **can't be jailbroken** into a bad refund (adversarial red-team, R2),
@@ -57,6 +60,9 @@ cd backend && uvicorn main:app --port 8099
 ```
 - Customer chat → http://127.0.0.1:8099/
 - Admin reasoning logs + **Run Red Team** → http://127.0.0.1:8099/admin
+
+**Or with Docker:** `GROQ_API_KEY=... docker compose up` → http://127.0.0.1:8099/
+**Tests:** `pip install -r requirements-dev.txt && pytest tests/ -v` — policy correctness, receipt integrity & tamper detection, output audit (runs in CI on every push, no API key needed).
 
 Try: *"Hi, I'm Maria Alvarez, refund ORD-1001"* (approves) · *James Bello / ORD-1002* (past 30 days → held) ·
 *Aisha Khan / ORD-1009* (gift card → denied) · *Isabella Rossi / ORD-1015* (over $500 → escalated) ·
