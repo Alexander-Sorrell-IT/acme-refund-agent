@@ -63,7 +63,7 @@ def run_turn(history_messages):
     last_verdict = {}
     for step in range(8):  # agent loop
         try:  # llm.chat throttles + retries transient failures (429/5xx) with backoff
-            resp = llm.chat(_client, model=_MODEL, messages=messages,
+            resp = llm.chat(_get_client(), model=_MODEL, messages=messages,
                             tools=TOOL_SCHEMAS, temperature=0.2, parallel_tool_calls=False)
         except Exception as e:
             logbus.publish("error", f"LLM unavailable after retries: {str(e)[:80]}")

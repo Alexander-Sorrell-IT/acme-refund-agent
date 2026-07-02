@@ -20,7 +20,12 @@ from dotenv import load_dotenv
 import logbus, llm
 
 load_dotenv(os.path.join(os.path.dirname(__file__), "..", ".env"))
-_client = OpenAI(api_key=os.getenv("GROQ_API_KEY") or "not-set", base_url="https://api.groq.com/openai/v1")
+_client = None
+def _get_client():
+    global _client
+    if _client is None:
+        _client = OpenAI(api_key=os.getenv("GROQ_API_KEY") or "not-set", base_url="https://api.groq.com/openai/v1")
+    return _client
 
 # three independent witnesses — different vendors, so blind spots don't correlate
 WITNESSES = ["llama-3.3-70b-versatile", "openai/gpt-oss-120b", "qwen/qwen3-32b"]
@@ -37,7 +42,7 @@ Respond with ONLY a JSON object: {{"manipulated": true/false, "reason": "<one sh
 
 def _ask(model, reply, verdict):
     try:
-        r = llm.chat(_client, model=model, temperature=0, max_tokens=512,
+        r = llm.chat(_get_client(), model=model, temperature=0, max_tokens=512,
             messages=[{"role": "user", "content": _PROMPT.format(
                 decision=verdict.get("decision", ""), rule=verdict.get("rule", ""), reply=reply)}])
         txt = r.choices[0].message.content or ""
