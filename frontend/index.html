@@ -1,0 +1,27 @@
+<!doctype html><html><head><meta charset="utf-8"><title>Acme — Refund Support</title>
+<meta name="viewport" content="width=device-width, initial-scale=1"><link rel="stylesheet" href="/static/style.css"></head>
+<body><div class="wrap">
+<header><div><h1>Acme Store — Refund Support 🛍️</h1><div class="sub">AI agent · deterministic policy engine owns every verdict</div></div>
+<a href="/admin" target="_blank">Admin: reasoning logs →</a></header>
+<div id="msgs"></div>
+<div class="samples">Try: <b>"Hi, I'm Maria Alvarez, I want to refund order ORD-1001"</b> (approves) · <b>James Bello / ORD-1002</b> (past 30 days → held) · <b>Aisha Khan / ORD-1009</b> (gift card → denied) · <b>Isabella Rossi / ORD-1015</b> (over $500 → escalated)</div>
+<div class="inputbar"><input id="in" placeholder="Type your refund request…" autofocus>
+<button id="send">Send</button></div>
+</div>
+<script>
+const msgs=document.getElementById('msgs'), input=document.getElementById('in'), send=document.getElementById('send');
+let history=[];
+function add(role,text){const d=document.createElement('div');d.className='msg '+(role==='user'?'user':'bot');d.textContent=text;msgs.appendChild(d);msgs.scrollTop=msgs.scrollHeight;}
+add('bot',"Hi! I'm Acme's refund assistant. Tell me your name and the order you'd like refunded, and I'll check it against our policy.");
+async function go(){
+  const t=input.value.trim(); if(!t) return; input.value='';
+  add('user',t); history.push({role:'user',content:t});
+  const btnText=send.textContent; send.textContent='…'; send.disabled=true;
+  try{
+    const r=await fetch('/chat',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({messages:history})});
+    const j=await r.json(); history=j.messages; add('bot',j.reply);
+  }catch(e){ add('bot','(connection error)'); }
+  send.textContent=btnText; send.disabled=false; input.focus();
+}
+send.onclick=go; input.addEventListener('keydown',e=>{if(e.key==='Enter')go();});
+</script></body></html>

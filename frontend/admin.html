@@ -1,0 +1,37 @@
+<!doctype html><html><head><meta charset="utf-8"><title>Admin — Agent Reasoning Logs</title>
+<meta name="viewport" content="width=device-width, initial-scale=1"><link rel="stylesheet" href="/static/style.css"></head>
+<body><div class="wrap" style="max-width:900px">
+<header><div><h1>Agent Reasoning Logs 🔍</h1><div class="sub">Live trace · tool calls, deterministic verdicts, failures &amp; retries</div></div>
+<div><button id="rt" style="background:#f85149;color:#fff;border:0;padding:9px 16px;border-radius:8px;cursor:pointer;font-weight:600;margin-right:10px">⚔️ Run Red Team</button><a href="/" target="_blank" style="color:var(--accent)">← Customer chat</a></div></header>
+<div id="rtresult"></div>
+<div class="log" id="log"></div>
+<div class="legend">Legend: <span style="color:var(--accent)">USER</span> · <span style="color:var(--purple)">LLM</span> · <span style="color:var(--muted)">TOOL</span> · <span style="color:var(--green)">VERDICT</span> (amber = deny/escalate) · <span style="color:#58a6ff">AGENT</span> · <span style="color:var(--red)">RETRY/ERROR</span></div>
+</div>
+<script>
+const log=document.getElementById('log');
+function fmt(ts){return new Date(ts*1000).toLocaleTimeString();}
+function row(e){
+  const kind=e.kind; let cls=kind;
+  if(kind==='verdict'&&e.data&&/DENY|ESCALATE/.test(e.data.decision||''))cls='verdict '+e.data.decision.toLowerCase();
+  const d=document.createElement('div'); d.className='row '+cls;
+  let detail=''; if(e.data&&Object.keys(e.data).length) detail='<div class="d">'+JSON.stringify(e.data)+'</div>';
+  d.innerHTML='<span class="k">'+kind+'</span><span class="t">'+fmt(e.ts)+'</span> '+(e.message||'')+detail;
+  log.appendChild(d); log.scrollTop=log.scrollHeight;
+}
+const es=new EventSource('/logs');
+es.onmessage=ev=>{try{row(JSON.parse(ev.data));}catch(e){}};
+const rt=document.getElementById('rt'), rtr=document.getElementById('rtresult');
+rt.onclick=async()=>{
+  rt.disabled=true; rt.textContent='⚔️ Running attacks…';
+  rtr.innerHTML='<div style="padding:12px 20px;color:var(--muted)">Running adversarial battery — watch the log below…</div>';
+  try{
+    const r=await fetch('/redteam',{method:'POST'}); const j=await r.json();
+    const ok=j.violations===0;
+    let rows=j.results.map(x=>`<div style="font-size:12px;padding:2px 0;color:${x.held_the_line?'var(--green)':'var(--red)'}">${x.held_the_line?'✅':'❌'} ${x.attack} — policy ${x.policy_verdict} (${x.rule})</div>`).join('');
+    rtr.innerHTML=`<div style="margin:12px 20px;padding:14px 18px;border-radius:10px;border:1px solid ${ok?'var(--green)':'var(--red)'};background:var(--panel)">
+      <div style="font-size:18px;font-weight:700;color:${ok?'var(--green)':'var(--red)'}">${j.held}/${j.total} held the line · ${j.violations} policy violations</div>
+      <div style="color:var(--muted);font-size:12px;margin:4px 0 8px">Adversarial customers tried to manipulate the agent into unapproved refunds. The deterministic grader checks realized actions against the policy verdict.</div>${rows}</div>`;
+  }catch(e){ rtr.innerHTML='<div style="padding:12px 20px;color:var(--red)">error running red team</div>'; }
+  rt.disabled=false; rt.textContent='⚔️ Run Red Team';
+};
+</script></body></html>

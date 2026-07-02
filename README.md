@@ -1,0 +1,76 @@
+# Acme Refund Agent — a refund agent you can *prove* won't be talked into a bad refund
+
+> Most "AI refund agent" demos are something you have to **trust**. This one is something you can **verify.**
+> The LLM talks to the customer and orchestrates tools — but a **deterministic policy engine owns every
+> approve/deny decision**, and an **adversarial red-team harness proves the agent can't be manipulated**
+> into issuing a refund the policy forbids.
+
+Built for the Foundersmax AI Engineer take-home. Stack: **FastAPI + Groq (llama-3.3-70b) function-calling + a pure-Python policy engine + a live reasoning-log dashboard.**
+
+---
+
+## The core idea: models propose, a deterministic function owns the verdict
+
+An LLM deciding refunds is a liability — a good sob story or a prompt injection can flip it. So the model here
+**never decides.** It gathers facts (customer, order), then calls `evaluate_refund_policy`, which runs a
+**pure function** (`backend/policy.py`) that returns `APPROVE_FULL | STORE_CREDIT | ESCALATE | DENY` with the
+**exact rule ID** it cites. `issue_refund` **re-derives that verdict server-side**, so even a fully
+jailbroken model physically cannot push through a refund the policy denied.
+
+Same order in → same verdict out, every time, with a citation. That's the whole design.
+
+---
+
+## What's inside
+
+| Requirement | How it's met |
+|---|---|
+| **Mock data** | `data/customers.json` — 15 profiles crafted to hit every rule; `data/refund_policy.md` — 8 strict rules + precedence |
+| **Agent backend** | `backend/agent.py` — Groq function-calling loop (sequential tool calls; retry-with-backoff on LLM failure, visible in the log) |
+| **Tools validate policy** | `backend/tools.py` — `lookup_customer`, `get_order` (ownership check), `evaluate_refund_policy` (deterministic), `issue_refund` (re-verified) |
+| **Frontend** | `frontend/index.html` customer chat · `frontend/admin.html` **real-time reasoning-log dashboard** |
+| **⭐ Differentiator** | `backend/redteam.py` — **adversarial red-team harness**: an adversarial "customer" attacks the agent (prompt injection, false authority, guilt trips, urgency, double-dip) and a **deterministic grader proves the agent held the line.** Latest run: **8/8 held, 0 violations.** |
+
+## Why the red-team harness matters (the part no one else brings)
+Anyone can build a happy-path refund bot. The risk in production is the *unhappy* path — a customer
+manipulating the agent into money it shouldn't give. So this repo ships the **proof of safety, not just the
+feature**: `python backend/redteam.py` runs a battery of manipulation attacks and grades the agent's
+*realized actions* against the ground-truth policy. It's the same principle as my
+[doomcaller](https://github.com/Alexander-Sorrell-IT/doomcaller) project — an adversarial generator, a
+deterministic judge. A refund agent isn't done when it works; it's done when you can't break it.
+
+---
+
+## Run it
+
+```bash
+cd foundersmax-refund-agent
+pip install -r requirements.txt
+cp .env.example .env          # add your GROQ_API_KEY (free at console.groq.com)
+cd backend && uvicorn main:app --port 8099
+```
+- Customer chat → http://127.0.0.1:8099/
+- Admin reasoning logs + **Run Red Team** → http://127.0.0.1:8099/admin
+
+Try: *"Hi, I'm Maria Alvarez, refund ORD-1001"* (approves) · *James Bello / ORD-1002* (past 30 days → held) ·
+*Aisha Khan / ORD-1009* (gift card → denied) · *Isabella Rossi / ORD-1015* (over $500 → escalated) ·
+then open **/admin** and hit **Run Red Team**.
+
+## Architecture
+```
+customer ──chat──▶ agent loop (Groq, function-calling)
+                     │  lookup_customer → get_order → evaluate_refund_policy → issue_refund
+                     ▼
+              POLICY ENGINE (pure function)  ── the verdict, with a rule citation
+                     │
+         every step ▼ published to the reasoning-log bus → /admin dashboard (SSE)
+
+red-team ──▶ adversarial customer attacks the whole loop ──▶ deterministic grader ──▶ "held N/N, 0 violations"
+```
+
+## Design notes
+- **Rule precedence** (`refund_policy.md`): ownership → abuse-hold → already-refunded → non-refundable category → window → high-value → condition. E.g. a *defective* item that's *past the window* is still denied (R1 beats R5); a *defective* item over $500 escalates (R6 beats R5).
+- **`days_since_delivery`** is stored on each order so demos are stable regardless of run date.
+- **Voice (bonus):** the pipeline is designed so a spoken channel (Deepgram STT → agent → ElevenLabs TTS) can be transcribed and **audited deterministically** — the same verify-the-model principle, extended to voice. (Stubbed for the core submission.)
+
+Author: **Alexander Sorrell** · github.com/Alexander-Sorrell-IT
