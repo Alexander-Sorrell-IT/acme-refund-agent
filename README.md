@@ -88,3 +88,14 @@ red-team ──▶ adversarial customer attacks the whole loop ──▶ determi
 - **Voice (bonus):** Deepgram STT → agent → ElevenLabs TTS; the audit above grades the spoken transcript identically.
 
 Author: **Alexander Sorrell** · github.com/Alexander-Sorrell-IT
+
+
+## Self-audit & hardening (I attacked my own system)
+Beyond attacking the *agent*, I adversarially audited the *codebase* and fixed four gaps — each now has a regression test:
+- **Money guarantee moved into the money function.** `issue_refund` re-derives the verdict itself and never accepts one from its caller, so nothing upstream (jailbroken LLM, buggy orchestrator, a direct call) can force a refund the policy denies. It's true *by construction*, not by orchestration discipline.
+- **Strict identity resolution.** `find_customer` no longer resolves a single letter, a lone last name, or a negated mention ("I am NOT Marcus Feld"); ambiguous input returns nothing so the agent asks for an order ID/email.
+- **Witness panel fails closed.** If fewer than a quorum of witnesses vote, the panel reports `DEGRADED`, never a false "held."
+- **Shared rate-limiter + backoff** (`llm.py`) so large adversarial runs degrade gracefully instead of collapsing under 429s.
+
+## Multi-model witness panel (thoth fold, deepened)
+`witness_panel.py` — three independent vendors (Meta Llama, OpenAI gpt-oss, Alibaba Qwen) each judge whether the agent was manipulated; a deterministic consensus decides (flag if any witness sees manipulation). Real model diversity + deterministic aggregation — the honest form of a "cross-model" adversarial check, straight from thoth's multi-witness discipline.

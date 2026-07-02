@@ -38,15 +38,25 @@ def evaluate_refund_policy(customer_id: str, order_id: str):
     logbus.publish("receipt", f"receipt #{rc['seq']} sealed — hash {rc['hash'][:12]}…", {"seq": rc["seq"], "hash": rc["hash"]})
     return verdict
 
-def issue_refund(order_id: str, verdict: dict):
-    if verdict.get("decision") not in ("APPROVE_FULL", "STORE_CREDIT"):
+def issue_refund(customer_id: str, order_id: str):
+    """Issue a refund. The verdict is RE-DERIVED here from the deterministic engine and is the
+    sole authority — this function never accepts a verdict from its caller, so nothing upstream
+    (a jailbroken LLM, a buggy orchestrator, a direct call) can push through a refund the policy
+    denies. The safety invariant lives in the function that moves the money."""
+    c = crm.find_customer(customer_id)
+    o = crm.get_order(c, order_id)
+    if not c or not o:
+        logbus.publish("tool", f"issue_refund BLOCKED for {order_id}", {"reason": "order not owned (R8)"})
+        return {"issued": False, "message": "Refund not issued — order not found on this account (R8)."}
+    verdict = evaluate_refund(c, o).dict()   # authoritative, re-derived at the point of payment
+    if verdict["decision"] not in ("APPROVE_FULL", "STORE_CREDIT"):
         logbus.publish("tool", f"issue_refund BLOCKED for {order_id}",
-                       {"reason": "verdict was not an approval"})
-        return {"issued": False, "message": "Refund not issued — the verdict was not an approval."}
+                       {"reason": f"policy verdict is {verdict['decision']} ({verdict['rule']})"})
+        return {"issued": False, "message": f"Refund not issued — policy verdict is {verdict['decision']} ({verdict['rule']})."}
     crm.mark_refunded(order_id)
     logbus.publish("tool", f"issue_refund({order_id})",
-                   {"amount": verdict["refund_amount"], "type": verdict["refund_type"]})
-    return {"issued": True, "amount": verdict["refund_amount"], "type": verdict["refund_type"]}
+                   {"amount": verdict["refund_amount"], "type": verdict["refund_type"], "rule": verdict["rule"]})
+    return {"issued": True, "amount": verdict["refund_amount"], "type": verdict["refund_type"], "rule": verdict["rule"]}
 
 TOOLS = {"lookup_customer": lookup_customer, "get_order": get_order,
          "evaluate_refund_policy": evaluate_refund_policy, "issue_refund": issue_refund}

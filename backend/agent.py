@@ -7,11 +7,11 @@ verdict server-side, so the model physically cannot approve a refund the policy 
 import os, json, time
 from openai import OpenAI
 from dotenv import load_dotenv
-import tools, crm, logbus
+import tools, crm, logbus, llm
 from policy import evaluate_refund
 from audit import audit_reply
 
-load_dotenv()
+load_dotenv(os.path.join(os.path.dirname(__file__), "..", ".env"))
 _client = OpenAI(api_key=os.getenv("GROQ_API_KEY"),
                  base_url="https://api.groq.com/openai/v1")
 _MODEL = os.getenv("GROQ_MODEL", "llama-3.3-70b-versatile")
@@ -51,10 +51,8 @@ def _dispatch(name, args):
     if name == "evaluate_refund_policy":
         return tools.evaluate_refund_policy(args.get("customer_id", ""), args.get("order_id", ""))
     if name == "issue_refund":
-        cid, oid = args.get("customer_id", ""), args.get("order_id", "")
-        c = crm.find_customer(cid); o = crm.get_order(c, oid)
-        verdict = evaluate_refund(c, o).dict() if (c and o) else {"decision": "DENY", "rule": "R8"}
-        return tools.issue_refund(oid, verdict)   # re-verified: only real approvals issue
+        # issue_refund re-derives the verdict itself — no verdict is passed in, by design
+        return tools.issue_refund(args.get("customer_id", ""), args.get("order_id", ""))
     return {"error": f"unknown tool {name}"}
 
 
@@ -64,20 +62,12 @@ def run_turn(history_messages):
     logbus.publish("user", history_messages[-1]["content"] if history_messages else "")
     last_verdict = {}
     for step in range(8):  # agent loop
-        resp = None
-        for attempt in range(3):  # retry transient LLM failures (visible in the log)
-            try:
-                resp = _client.chat.completions.create(model=_MODEL, messages=messages,
-                                                        tools=TOOL_SCHEMAS, temperature=0.2,
-                                                        parallel_tool_calls=False)
-                break
-            except Exception as e:
-                logbus.publish("retry", f"LLM call failed (attempt {attempt+1}/3): {e}")
-                time.sleep(1.2 * (attempt + 1))
-        if resp is None:
-            reply = "Sorry — I'm having trouble right now. Please try again in a moment."
-            logbus.publish("error", "LLM unavailable after retries")
-            return reply, messages[1:]
+        try:  # llm.chat throttles + retries transient failures (429/5xx) with backoff
+            resp = llm.chat(_client, model=_MODEL, messages=messages,
+                            tools=TOOL_SCHEMAS, temperature=0.2, parallel_tool_calls=False)
+        except Exception as e:
+            logbus.publish("error", f"LLM unavailable after retries: {str(e)[:80]}")
+            return "Sorry — I'm having trouble right now. Please try again in a moment.", messages[1:]
         msg = resp.choices[0].message
         if msg.tool_calls:
             logbus.publish("llm", f"agent decided to call {len(msg.tool_calls)} tool(s)")
