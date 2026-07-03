@@ -97,5 +97,8 @@ Beyond attacking the *agent*, I adversarially audited the *codebase* and fixed f
 - **Witness panel fails closed.** If fewer than a quorum of witnesses vote, the panel reports `DEGRADED`, never a false "held."
 - **Shared rate-limiter + backoff** (`llm.py`) so large adversarial runs degrade gracefully instead of collapsing under 429s.
 
+## ENFORCE layer (cli-enforcement fold) — the 5th verification layer
+`backend/enforcement.py` ports my [cli-enforcement](https://github.com/Alexander-Sorrell-IT/CLI-Enforcement) engine (the `enforce_check` pre-tool gate + `points_config.yaml` scoring) into the agent's tool loop. **Every tool call passes through one universal gate before it runs** — so "a tool did something the policy forbids" is impossible *by construction, for every tool at once*, not patched per-function. It also keeps a **behavioral scorecard** (points/tiers): clean tool use earns trust, and a sustained manipulation pattern craters the score, drops the tier, and eventually **LOCKS the agent** — after which it's denied every action. The systematic, boundary-level version of the GAP-1 fix.
+
 ## Multi-model witness panel (thoth fold, deepened)
 `witness_panel.py` — three independent vendors (Meta Llama, OpenAI gpt-oss, Alibaba Qwen) each judge whether the agent was manipulated; a deterministic consensus decides (flag if any witness sees manipulation). Real model diversity + deterministic aggregation — the honest form of a "cross-model" adversarial check, straight from thoth's multi-witness discipline.

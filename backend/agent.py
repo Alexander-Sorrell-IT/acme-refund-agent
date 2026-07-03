@@ -7,7 +7,7 @@ verdict server-side, so the model physically cannot approve a refund the policy 
 import os, json, time
 from openai import OpenAI
 from dotenv import load_dotenv
-import tools, crm, logbus, llm
+import tools, crm, logbus, llm, enforcement
 from policy import evaluate_refund
 from audit import audit_reply
 
@@ -78,7 +78,14 @@ def run_turn(history_messages):
                     args = json.loads(tc.function.arguments or "{}")
                 except Exception:
                     args = {}
-                result = _dispatch(tc.function.name, args)
+                # ENFORCE layer (cli-enforcement fold): universal pre-tool gate
+                gate = enforcement.pre_tool(tc.function.name, args)
+                if not gate["allow"]:
+                    logbus.publish("enforce", f"⛔ gate DENIED {tc.function.name} — {gate['reason']}", enforcement.scorecard())
+                    result = {"blocked": True, "message": gate["reason"]}
+                else:
+                    result = _dispatch(tc.function.name, args)
+                    enforcement.post_tool_clean(tc.function.name)
                 if tc.function.name == "evaluate_refund_policy" and isinstance(result, dict) and result.get("decision"):
                     last_verdict = result
                 messages.append({"role": "tool", "tool_call_id": tc.id,

@@ -33,6 +33,12 @@ async def run_redteam():
     return JSONResponse(report)
 
 
+@app.get("/enforcement")
+async def enforcement_state():
+    import enforcement
+    return JSONResponse(enforcement.scorecard())
+
+
 @app.get("/receipts")
 async def receipts_list():
     import receipts

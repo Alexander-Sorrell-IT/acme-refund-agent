@@ -4,3 +4,4 @@ __pycache__/
 .DS_Store
 venv/
 data/receipts_export.json
+data/enforcement_state.json
