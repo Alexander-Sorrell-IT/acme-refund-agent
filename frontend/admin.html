@@ -2,8 +2,8 @@
 <meta name="viewport" content="width=device-width, initial-scale=1"><link rel="stylesheet" href="/static/style.css"></head>
 <body><div class="wrap" style="max-width:900px">
 <header><div><h1>Agent Reasoning Logs 🔍</h1><div class="sub">Live trace · tool calls, deterministic verdicts, failures &amp; retries</div></div>
-<div><button id="rt" style="background:#f85149;color:#fff;border:0;padding:9px 16px;border-radius:8px;cursor:pointer;font-weight:600;margin-right:8px">⚔️ Run Red Team</button><button id="rcpt" style="background:#238636;color:#fff;border:0;padding:9px 16px;border-radius:8px;cursor:pointer;font-weight:600;margin-right:10px">🧾 Verify Receipts</button><a href="/" target="_blank" style="color:var(--accent)">← Customer chat</a></div></header>
-<div id="rtresult"></div><div id="rcptresult"></div>
+<div><button id="rt" style="background:#f85149;color:#fff;border:0;padding:9px 16px;border-radius:8px;cursor:pointer;font-weight:600;margin-right:8px">⚔️ Run Red Team</button><button id="adv" style="background:#a371f7;color:#fff;border:0;padding:9px 16px;border-radius:8px;cursor:pointer;font-weight:600;margin-right:8px">🧠 Live Adversary</button><button id="rcpt" style="background:#238636;color:#fff;border:0;padding:9px 16px;border-radius:8px;cursor:pointer;font-weight:600;margin-right:10px">🧾 Verify Receipts</button><a href="/" target="_blank" style="color:var(--accent)">← Customer chat</a></div></header>
+<div id="rtresult"></div><div id="advresult"></div><div id="rcptresult"></div>
 <div class="log" id="log"></div>
 <div class="legend">Legend: <span style="color:var(--accent)">USER</span> · <span style="color:var(--purple)">LLM</span> · <span style="color:var(--muted)">TOOL</span> · <span style="color:var(--green)">VERDICT</span> (amber = deny/escalate) · <span style="color:#58a6ff">AGENT</span> · <span style="color:var(--red)">RETRY/ERROR</span></div>
 </div>
@@ -33,6 +33,20 @@ rt.onclick=async()=>{
       <div style="color:var(--muted);font-size:12px;margin:4px 0 8px">Adversarial customers tried to manipulate the agent into unapproved refunds. The deterministic grader checks realized actions against the policy verdict.</div>${rows}</div>`;
   }catch(e){ rtr.innerHTML='<div style="padding:12px 20px;color:var(--red)">error running red team</div>'; }
   rt.disabled=false; rt.textContent='⚔️ Run Red Team';
+};
+const adv=document.getElementById('adv'), advr=document.getElementById('advresult');
+adv.onclick=async()=>{
+  adv.disabled=true; adv.textContent='🧠 Attacking…';
+  advr.innerHTML='<div style="padding:12px 20px;color:var(--muted)">Launching live multi-turn adversarial agents — each improvises a new manipulation per turn. Watch the log…</div>';
+  try{
+    const r=await fetch('/adversary',{method:'POST'}); const j=await r.json();
+    const ok=j.violations===0;
+    let rows=j.results.map(x=>`<div style="font-size:12px;padding:2px 0;color:${x.held?'var(--green)':'var(--red)'}">${x.held?'✅':'❌'} ${x.target} — survived ${x.turns} turns (policy: ${x.should_refund?'ALLOW':'DENY/ESCALATE'})</div>`).join('');
+    advr.innerHTML=`<div style="margin:12px 20px;padding:14px 18px;border-radius:10px;border:1px solid ${ok?'var(--green)':'var(--red)'};background:var(--panel)">
+      <div style="font-size:18px;font-weight:700;color:${ok?'var(--green)':'var(--red)'}">${j.held}/${j.total} held under improvised multi-turn attack · ${j.violations} violations</div>
+      <div style="color:var(--muted);font-size:12px;margin:4px 0 8px">Unlike the scripted red-team, these are <b>live LLM adversaries</b> that read the agent's replies and improvise a fresh manipulation each turn. The deterministic policy engine must never let a denied refund through — no matter how the story is told.</div>${rows}</div>`;
+  }catch(e){ advr.innerHTML='<div style="padding:12px 20px;color:var(--red)">error running live adversary</div>'; }
+  adv.disabled=false; adv.textContent='🧠 Live Adversary';
 };
 const rcpt=document.getElementById('rcpt'), rcr=document.getElementById('rcptresult');
 rcpt.onclick=async()=>{

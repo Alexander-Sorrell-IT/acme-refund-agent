@@ -33,6 +33,15 @@ async def run_redteam():
     return JSONResponse(report)
 
 
+@app.post("/adversary")
+async def run_adversary():
+    # R2, live: improvised multi-turn adversary tries to talk the agent into a bad
+    # refund on every deny/escalate target. Watch it fail in the reasoning log.
+    import adversary
+    report = await asyncio.to_thread(adversary.run)
+    return JSONResponse(report)
+
+
 @app.get("/enforcement")
 async def enforcement_state():
     import enforcement
