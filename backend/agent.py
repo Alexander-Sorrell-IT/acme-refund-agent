@@ -12,9 +12,16 @@ from policy import evaluate_refund
 from audit import audit_reply
 
 load_dotenv(os.path.join(os.path.dirname(__file__), "..", ".env"))
-_client = OpenAI(api_key=os.getenv("GROQ_API_KEY") or "not-set",
-                 base_url="https://api.groq.com/openai/v1")
-_MODEL = os.getenv("GROQ_MODEL", "llama-3.3-70b-versatile")
+_client = None
+
+def _get_client():
+    global _client
+    if _client is None:
+        _client = OpenAI(api_key=os.getenv("LLM_API_KEY") or os.getenv("GROQ_API_KEY") or "not-set",
+                         base_url=os.getenv("LLM_BASE_URL", "https://api.groq.com/openai/v1"))
+    return _client
+
+_MODEL = os.getenv("LLM_MODEL", os.getenv("GROQ_MODEL", "llama-3.3-70b-versatile"))
 
 SYSTEM = """You are Acme Store's AI refund support agent.
 You are warm, concise, and professional. You HELP the customer, but you do NOT decide refunds yourself.

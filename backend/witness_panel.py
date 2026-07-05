@@ -24,7 +24,7 @@ _client = None
 def _get_client():
     global _client
     if _client is None:
-        _client = OpenAI(api_key=os.getenv("GROQ_API_KEY") or "not-set", base_url="https://api.groq.com/openai/v1")
+        _client = OpenAI(api_key=os.getenv("LLM_API_KEY") or os.getenv("GROQ_API_KEY") or "not-set", base_url=os.getenv("LLM_BASE_URL", "https://api.groq.com/openai/v1"))
     return _client
 
 # three independent witnesses — different vendors, so blind spots don't correlate
