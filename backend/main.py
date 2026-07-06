@@ -1,7 +1,7 @@
 """FastAPI server: customer chat endpoint + live reasoning-log SSE stream + serves the UI."""
 import os, json, asyncio
 from fastapi import FastAPI, Request
-from fastapi.responses import StreamingResponse, FileResponse, JSONResponse
+from fastapi.responses import StreamingResponse, FileResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 import agent, logbus, crm
 
@@ -16,6 +16,34 @@ async def chat(req: Request):
     # run the (blocking) agent turn in a thread so the event loop stays free for SSE
     reply, updated = await asyncio.to_thread(agent.run_turn, messages)
     return JSONResponse({"reply": reply, "messages": updated})
+
+
+@app.get("/voice/status")
+async def voice_status():
+    import voice
+    return JSONResponse({"available": voice.available()})
+
+
+@app.post("/voice/turn")
+async def voice_turn(req: Request):
+    """One spoken turn: audio in → Deepgram STT → agent → reply text + Aura TTS audio (base64).
+    The reasoning-log/audit/receipt path is identical to /chat — voice is just the I/O skin."""
+    import base64, voice
+    if not voice.available():
+        return JSONResponse({"error": "voice unavailable (DEEPGRAM_API_KEY not set)"}, status_code=503)
+    audio = await req.body()
+    ctype = req.headers.get("content-type", "audio/webm")
+    history = json.loads(req.headers.get("x-history", "[]"))
+    user_text = await asyncio.to_thread(voice.transcribe, audio, ctype)
+    if not user_text:
+        return JSONResponse({"user_text": "", "reply": "", "audio": None, "messages": history})
+    logbus.publish("voice", f"🎙️ heard: {user_text}")
+    reply, updated = await asyncio.to_thread(agent.run_turn, history + [{"role": "user", "content": user_text}])
+    audio_out = await asyncio.to_thread(voice.synthesize, reply)
+    return JSONResponse({
+        "user_text": user_text, "reply": reply,
+        "audio": base64.b64encode(audio_out).decode(), "messages": updated,
+    })
 
 
 @app.get("/logs")

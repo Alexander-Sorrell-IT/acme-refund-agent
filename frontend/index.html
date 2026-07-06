@@ -6,7 +6,9 @@
 <div id="msgs"></div>
 <div class="samples">Try: <b>"Hi, I'm Maria Alvarez, I want to refund order ORD-1001"</b> (approves) · <b>James Bello / ORD-1002</b> (past 30 days → held) · <b>Aisha Khan / ORD-1009</b> (gift card → denied) · <b>Isabella Rossi / ORD-1015</b> (over $500 → escalated)</div>
 <div class="inputbar"><input id="in" placeholder="Type your refund request…" autofocus>
-<button id="send">Send</button></div>
+<button id="send">Send</button>
+<button id="mic" title="Hold to talk" style="display:none">🎙️</button></div>
+<div id="voicehint" class="sub" style="display:none;padding:6px 2px 0">Voice on (Deepgram STT → agent → Aura TTS). Click 🎙️ to talk, click again to send.</div>
 </div>
 <script>
 const msgs=document.getElementById('msgs'), input=document.getElementById('in'), send=document.getElementById('send');
@@ -24,4 +26,35 @@ async function go(){
   send.textContent=btnText; send.disabled=false; input.focus();
 }
 send.onclick=go; input.addEventListener('keydown',e=>{if(e.key==='Enter')go();});
+
+// ---- Voice channel: mic → Deepgram STT → agent → Aura TTS → autoplay ----
+const mic=document.getElementById('mic');
+let rec=null, chunks=[], recording=false;
+fetch('/voice/status').then(r=>r.json()).then(s=>{
+  if(s.available){ mic.style.display=''; document.getElementById('voicehint').style.display=''; }
+});
+mic.onclick=async()=>{
+  if(!recording){
+    const stream=await navigator.mediaDevices.getUserMedia({audio:true});
+    rec=new MediaRecorder(stream); chunks=[];
+    rec.ondataavailable=e=>chunks.push(e.data);
+    rec.onstop=async()=>{
+      stream.getTracks().forEach(t=>t.stop());
+      const blob=new Blob(chunks,{type:'audio/webm'});
+      mic.textContent='…'; mic.disabled=true;
+      try{
+        const r=await fetch('/voice/turn',{method:'POST',
+          headers:{'Content-Type':'audio/webm','x-history':JSON.stringify(history)},body:blob});
+        const j=await r.json();
+        if(j.user_text){ add('user','🎙️ '+j.user_text); }
+        if(j.reply){ history=j.messages; add('bot',j.reply); }
+        if(j.audio){ new Audio('data:audio/mp3;base64,'+j.audio).play(); }
+      }catch(e){ add('bot','(voice error)'); }
+      mic.textContent='🎙️'; mic.disabled=false;
+    };
+    rec.start(); recording=true; mic.textContent='⏹'; mic.style.background='#e53';
+  }else{
+    rec.stop(); recording=false; mic.style.background='';
+  }
+};
 </script></body></html>
