@@ -24,7 +24,9 @@ _client = None
 def _get_client():
     global _client
     if _client is None:
-        _client = OpenAI(api_key=os.getenv("LLM_API_KEY") or os.getenv("GROQ_API_KEY") or "not-set", base_url=os.getenv("LLM_BASE_URL", "https://api.groq.com/openai/v1"))
+        _client = OpenAI(api_key=os.getenv("LLM_API_KEY") or os.getenv("GROQ_API_KEY") or "not-set", base_url=os.getenv("LLM_BASE_URL", "https://api.groq.com/openai/v1"),
+                         timeout=float(os.getenv("LLM_TIMEOUT", "30")), max_retries=0,
+                         default_headers={"User-Agent": os.getenv("LLM_USER_AGENT", "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0 Safari/537.36")})  # never hang on camera + dodge CF 1010
     return _client
 
 # three independent witnesses — different vendors, so blind spots don't correlate

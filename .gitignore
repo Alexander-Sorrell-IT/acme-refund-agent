@@ -5,3 +5,6 @@ __pycache__/
 venv/
 data/receipts_export.json
 data/enforcement_state.json
+loom/
+IPHONE_LEVEL_IDEAS.md
+SUBMISSION_MESSAGE.md

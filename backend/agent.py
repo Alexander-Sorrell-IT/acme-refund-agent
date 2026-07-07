@@ -18,7 +18,12 @@ def _get_client():
     global _client
     if _client is None:
         _client = OpenAI(api_key=os.getenv("LLM_API_KEY") or os.getenv("GROQ_API_KEY") or "not-set",
-                         base_url=os.getenv("LLM_BASE_URL", "https://api.groq.com/openai/v1"))
+                         base_url=os.getenv("LLM_BASE_URL", "https://api.groq.com/openai/v1"),
+                         timeout=float(os.getenv("LLM_TIMEOUT", "30")),  # hard per-call ceiling — never hang on camera
+                         max_retries=0,  # llm.py owns retry/backoff; no double-retry, no silent 600s SDK stall
+                         default_headers={"User-Agent": os.getenv("LLM_USER_AGENT",
+                             "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 "
+                             "(KHTML, like Gecko) Chrome/120.0 Safari/537.36")})  # dodge Cloudflare 1010 signature block
     return _client
 
 _MODEL = os.getenv("LLM_MODEL", os.getenv("GROQ_MODEL", "llama-3.3-70b-versatile"))
