@@ -31,7 +31,9 @@ _MODEL = os.getenv("LLM_MODEL", os.getenv("GROQ_MODEL", "llama-3.3-70b-versatile
 SYSTEM = """You are Acme Store's AI refund support agent.
 You are warm, concise, and professional. You HELP the customer, but you do NOT decide refunds yourself.
 The deterministic policy engine decides. Your job:
-1. Identify the customer (lookup_customer) and their order (get_order).
+1. Identify the customer (lookup_customer) and their order (get_order). When you call lookup_customer,
+   pass the customer's COMPLETE full name exactly as they gave it (e.g. "Maria Alvarez"), or their email
+   or customer ID — NEVER just a first name or a partial, or the lookup will fail.
 2. ALWAYS call evaluate_refund_policy before saying anything about the outcome.
 3. Communicate the verdict's `reason` to the customer in your own warm words, and cite what the policy says.
 4. If the verdict is APPROVE_FULL or STORE_CREDIT, call issue_refund. If DENY or ESCALATE, do NOT issue —
@@ -110,5 +112,25 @@ def run_turn(history_messages):
             a = audit_reply(reply, last_verdict)
             logbus.publish("audit", f"reply audit: {a['grade']}" + ("" if a['consistent'] else " — " + "; ".join(a['flags'])), a)
         return reply, messages[1:]
-    logbus.publish("error", "agent loop hit step limit")
+    # loop ended without a clean LLM reply. If we already have a deterministic verdict,
+    # OWN the reply the same way we own the decision — compose it from the verdict, never deflect.
+    logbus.publish("error", "agent loop hit step limit — composing reply from the deterministic verdict")
+    if last_verdict:
+        return _reply_from_verdict(last_verdict), messages[1:]
     return "I've gathered the details but need a moment — let me connect you with a specialist.", messages[1:]
+
+
+def _reply_from_verdict(v: dict) -> str:
+    """Deterministic customer reply built straight from the policy verdict (no LLM)."""
+    d = v.get("decision", ""); rule = v.get("rule", ""); amt = v.get("refund_amount", 0)
+    reason = v.get("reason", "")
+    try: amt = f"${float(amt):.2f}"
+    except Exception: amt = str(amt)
+    if d == "APPROVE_FULL":
+        return f"You're approved for a full refund of {amt}. I've issued it per policy rule {rule}."
+    if d == "STORE_CREDIT":
+        return f"I can offer store credit of {amt} on this order, per rule {rule}. A full cash refund isn't available here."
+    if d == "ESCALATE":
+        return f"This one needs a human review, so I'm routing it to a specialist rather than deciding it automatically (rule {rule})."
+    # DENY
+    return f"I'm sorry, but I can't approve this refund. {reason} (rule {rule})."
